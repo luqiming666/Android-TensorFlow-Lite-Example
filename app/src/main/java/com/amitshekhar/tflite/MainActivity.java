@@ -1,20 +1,16 @@
 package com.amitshekhar.tflite;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.provider.MediaStore;
 import android.text.method.ScrollingMovementMethod;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
-
-import com.wonderkiln.camerakit.CameraKitError;
-import com.wonderkiln.camerakit.CameraKitEvent;
-import com.wonderkiln.camerakit.CameraKitEventListener;
-import com.wonderkiln.camerakit.CameraKitImage;
-import com.wonderkiln.camerakit.CameraKitVideo;
-import com.wonderkiln.camerakit.CameraView;
 
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -33,13 +29,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView textViewResult;
     private Button btnDetectObject, btnToggleCamera;
     private ImageView imageViewResult;
-    private CameraView cameraView;
+    private static final int REQUEST_IMAGE_CAPTURE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        cameraView = findViewById(R.id.cameraView);
+
         imageViewResult = findViewById(R.id.imageViewResult);
         textViewResult = findViewById(R.id.textViewResult);
         textViewResult.setMovementMethod(new ScrollingMovementMethod());
@@ -47,64 +43,52 @@ public class MainActivity extends AppCompatActivity {
         btnToggleCamera = findViewById(R.id.btnToggleCamera);
         btnDetectObject = findViewById(R.id.btnDetectObject);
 
-        cameraView.addCameraKitListener(new CameraKitEventListener() {
-            @Override
-            public void onEvent(CameraKitEvent cameraKitEvent) {
-
-            }
-
-            @Override
-            public void onError(CameraKitError cameraKitError) {
-
-            }
-
-            @Override
-            public void onImage(CameraKitImage cameraKitImage) {
-
-                Bitmap bitmap = cameraKitImage.getBitmap();
-
-                bitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false);
-
-                imageViewResult.setImageBitmap(bitmap);
-
-                final List<Classifier.Recognition> results = classifier.recognizeImage(bitmap);
-
-                textViewResult.setText(results.toString());
-
-            }
-
-            @Override
-            public void onVideo(CameraKitVideo cameraKitVideo) {
-
-            }
-        });
-
         btnToggleCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                cameraView.toggleFacing();
             }
         });
 
         btnDetectObject.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                cameraView.captureImage();
+                dispatchTakePictureIntent();
             }
         });
 
         initTensorFlowAndLoadModel();
     }
 
+    private void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+            // 获取拍摄的图片
+            Bitmap bitmap = (Bitmap) data.getExtras().get("data"); // 小尺寸的缩略图
+            int imgWidth = bitmap.getWidth();
+            int imgHeight = bitmap.getHeight();
+
+            Bitmap bitmap2 = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false);
+            imageViewResult.setImageBitmap(bitmap);
+            final List<Classifier.Recognition> results = classifier.recognizeImage(bitmap2);
+            textViewResult.setText(results.toString());
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
-        cameraView.start();
     }
 
     @Override
     protected void onPause() {
-        cameraView.stop();
         super.onPause();
     }
 
